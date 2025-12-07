@@ -472,6 +472,120 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Восстанавливаем оригинальные кнопки
+    function restoreOriginalButtons() {
+        Object.values(psychics).forEach(psychic => {
+            const votedButtons = document.querySelectorAll(`${psychic.buttonSelector}.voted-button`);
+            votedButtons.forEach(button => {
+                // Находим родительский контейнер кнопки
+                const parentContainer = button.closest('.vote_nominee_right');
+                if (parentContainer) {
+                    // Восстанавливаем оригинальную кнопку
+                    button.outerHTML = `
+                        <button class="button-main live active-vote-button" data-talent-name="${psychic.name}" data-talent-id="${psychic.id || getTalentIdByName(psychic.name)}">
+                            <div><span>оценить</span></div>
+                        </button>
+                    `;
+                }
+            });
+        });
+    }
+
+    // Получаем ID таланта по имени (вспомогательная функция)
+    function getTalentIdByName(name) {
+        for (const [id, psychic] of Object.entries(psychics)) {
+            if (psychic.name === name) return id;
+        }
+        return null;
+    }
+
+    // Функция сброса голосов (для тестирования)
+    window.resetAllVotes = function() {
+        if (confirm('Вы уверены, что хотите сбросить все голоса? Все ваши оценки будут удалены.')) {
+            // Удаляем все голоса из localStorage
+            Object.values(psychics).forEach(psychic => {
+                localStorage.removeItem(psychic.storageKey);
+            });
+            
+            // Восстанавливаем оригинальные кнопки "оценить"
+            restoreOriginalButtons();
+            
+            // Сбрасываем все модальные окна
+            document.querySelectorAll('.vote-modal').forEach(modal => {
+                const ratingSpan = modal.querySelector('[id^="selected-rating-"]');
+                if (ratingSpan) ratingSpan.textContent = '0';
+                
+                const ratingButtons = modal.querySelectorAll('.rating-btn');
+                ratingButtons.forEach(btn => btn.classList.remove('active'));
+                
+                const submitBtn = modal.querySelector('.button-main:not(.close-modal-btn)');
+                if (submitBtn) submitBtn.disabled = true;
+                
+                const statusDiv = modal.querySelector('.vote-status');
+                if (statusDiv) {
+                    statusDiv.className = 'vote-status';
+                    statusDiv.textContent = '';
+                }
+            });
+            
+            // Показываем сообщение об успешном сбросе
+            alert('Все голосы успешно сброшены! Теперь вы можете голосовать заново.');
+            
+            // Перезагружаем обработчики событий для кнопок
+            initVotingButtons();
+        }
+    };
+
+    // Инициализация кнопок голосования
+    function initVotingButtons() {
+        // Удаляем старые обработчики
+        document.querySelectorAll('.active-vote-button').forEach(btn => {
+            btn.replaceWith(btn.cloneNode(true));
+        });
+        
+        // Добавляем обработчики для новых кнопок
+        document.addEventListener('click', handleVoteButtonClick);
+        document.addEventListener('touchstart', handleVoteButtonTouch, {passive: false});
+    }
+
+    // Обработчик клика на кнопку голосования
+    function handleVoteButtonClick(e) {
+        const button = e.target.closest('.active-vote-button');
+        if (button) handleVoteButtonPress(button, e);
+    }
+
+    // Обработчик тача на кнопку голосования
+    function handleVoteButtonTouch(e) {
+        const button = e.target.closest('.active-vote-button');
+        if (button) {
+            e.preventDefault();
+            handleVoteButtonPress(button, e);
+        }
+    }
+
+    // Общая логика нажатия на кнопку голосования
+    function handleVoteButtonPress(button, originalEvent) {
+        originalEvent.preventDefault();
+        originalEvent.stopPropagation();
+        
+        const talentId = button.getAttribute('data-talent-id');
+        const psychic = psychics[talentId];
+        
+        if (psychic) {
+            const hasVoted = localStorage.getItem(psychic.storageKey);
+            if (hasVoted) {
+                alert(`Вы уже проголосовали за этого экстрасенса! Оценка: ${hasVoted}/10`);
+                return;
+            }
+            
+            const modal = document.getElementById(psychic.modalId);
+            if (modal) {
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+    }
+
     // Инициализация модальных окон
     function initVotingModals() {
         Object.entries(psychics).forEach(([id, psychic]) => {
@@ -581,58 +695,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Открытие модального окна при клике на кнопку "оценить"
-    document.addEventListener('click', function(e) {
-        const button = e.target.closest('.active-vote-button');
-        if (button) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const talentId = button.getAttribute('data-talent-id');
-            const psychic = psychics[talentId];
-            
-            if (psychic) {
-                const hasVoted = localStorage.getItem(psychic.storageKey);
-                if (hasVoted) {
-                    alert('Вы уже проголосовали за этого экстрасенса! Оценка: ' + hasVoted + '/10');
-                    return;
-                }
-                
-                const modal = document.getElementById(psychic.modalId);
-                if (modal) {
-                    modal.classList.add('active');
-                    document.body.style.overflow = 'hidden';
-                }
-            }
-        }
-    });
-    
-    // Добавляем обработчик touch для открытия
-    document.addEventListener('touchstart', function(e) {
-        const button = e.target.closest('.active-vote-button');
-        if (button) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const talentId = button.getAttribute('data-talent-id');
-            const psychic = psychics[talentId];
-            
-            if (psychic) {
-                const hasVoted = localStorage.getItem(psychic.storageKey);
-                if (hasVoted) {
-                    alert('Вы уже проголосовали за этого экстрасенса! Оценка: ' + hasVoted + '/10');
-                    return;
-                }
-                
-                const modal = document.getElementById(psychic.modalId);
-                if (modal) {
-                    modal.classList.add('active');
-                    document.body.style.overflow = 'hidden';
-                }
-            }
-        }
-    }, {passive: false});
-
     // Закрытие по Escape
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
@@ -646,7 +708,34 @@ document.addEventListener('DOMContentLoaded', function() {
     // Инициализация
     checkExistingVotes();
     initVotingModals();
+    initVotingButtons();
+    
+    // Добавляем кнопку сброса голосов в консоль (для администратора)
+    console.log('Для сброса голосов выполните: resetAllVotes()');
+    
+    // Создаем видимую кнопку сброса голосов (для удобства тестирования)
+    // Раскомментируйте для отладки:
+    /*
+    const resetButton = document.createElement('button');
+    resetButton.textContent = 'Сбросить голоса';
+    resetButton.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 10000;
+        background: #f44336;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 12px;
+    `;
+    resetButton.addEventListener('click', window.resetAllVotes);
+    document.body.appendChild(resetButton);
+    */
 });
+
 </script>
 
 </body></html>
