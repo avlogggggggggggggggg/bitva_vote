@@ -1,0 +1,1 @@
+window.calculateImgSizesAttr=function(e){var n=arguments.length>1&&void 0!==arguments[1]&&arguments[1],i=e;n&&(i=e.closest(n));var t=i.getBoundingClientRect().width;t&&(e.onload=null,e.sizes=Math.ceil(t/window.innerWidth*100)+"vw",e.parentElement.childNodes.forEach((function(n){return n.sizes=e.sizes})))};
